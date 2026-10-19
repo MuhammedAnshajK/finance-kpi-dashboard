@@ -1,0 +1,74 @@
+// Finance KPI Dashboard: DAX measures
+// Table names: Finance (from data/finance_monthly.csv) and 'Date' (calendar table, see BUILD_STEPS.md).
+// All amounts are $ thousands.
+
+// ---------- Base measures ----------
+Revenue = SUM ( Finance[revenue] )
+
+Budget Revenue = SUM ( Finance[budget_revenue] )
+
+Cost of Sales = SUM ( Finance[cost_of_sales] )
+
+Operating Expenses = SUM ( Finance[operating_expenses] )
+
+Gross Profit = [Revenue] - [Cost of Sales]
+
+EBITDA = [Gross Profit] - [Operating Expenses]
+
+// ---------- Margins ----------
+Gross Margin % = DIVIDE ( [Gross Profit], [Revenue] )
+
+EBITDA Margin % = DIVIDE ( [EBITDA], [Revenue] )
+
+// ---------- Budget variance ----------
+Variance to Budget = [Revenue] - [Budget Revenue]
+
+Variance to Budget % = DIVIDE ( [Variance to Budget], [Budget Revenue] )
+
+// Used for conditional formatting of the variance bars: 1 = ahead of budget, 0 = behind
+Variance Is Positive = IF ( [Variance to Budget] >= 0, 1, 0 )
+
+// ---------- Prior period comparisons ----------
+Revenue PY = CALCULATE ( [Revenue], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+
+Revenue YoY % = DIVIDE ( [Revenue] - [Revenue PY], [Revenue PY] )
+
+Revenue YTD = TOTALYTD ( [Revenue], 'Date'[Date] )
+
+Revenue YTD PY = CALCULATE ( [Revenue YTD], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+
+Gross Margin % PY = CALCULATE ( [Gross Margin %], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+
+Gross Margin Change (pts) = ( [Gross Margin %] - [Gross Margin % PY] ) * 100
+
+EBITDA Margin % PY = CALCULATE ( [EBITDA Margin %], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+
+EBITDA Margin Change (pts) = ( [EBITDA Margin %] - [EBITDA Margin % PY] ) * 100
+
+// Rolling 12 months, for the "Last 12 months" view
+Revenue R12M =
+VAR LastDate = MAX ( 'Date'[Date] )
+RETURN
+    CALCULATE (
+        [Revenue],
+        DATESINPERIOD ( 'Date'[Date], LastDate, -12, MONTH )
+    )
+
+// ---------- Cash conversion ----------
+// Receivables are a balance, so take the closing month, not the sum over the period.
+Closing Receivables =
+VAR LastMonth = MAX ( Finance[month_date] )
+RETURN
+    CALCULATE ( SUM ( Finance[receivables] ), Finance[month_date] = LastMonth )
+
+// DSO = closing receivables / annualised revenue of the closing month x 365
+DSO (days) =
+VAR LastMonth = MAX ( Finance[month_date] )
+VAR ClosingRevenue =
+    CALCULATE ( [Revenue], Finance[month_date] = LastMonth )
+RETURN
+    DIVIDE ( [Closing Receivables], ClosingRevenue * 12 ) * 365
+
+// ---------- Region share ----------
+Revenue Share of Total =
+DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( Finance[region] ) ) )

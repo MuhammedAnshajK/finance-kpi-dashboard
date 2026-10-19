@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance KPI Dashboard</title>
+<meta name="description" content="Interactive finance KPI dashboard: revenue vs budget, margins, cash conversion and regional performance.">
+<style>
+  :root {
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --s1: #2a78d6; --s2: #eb6834; --pos: #2a78d6; --neg: #e34948; --mid: #f0efec;
+    --good: #006300; --bad: #b42323; --wash: rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+      --s1: #3987e5; --s2: #d95926; --pos: #3987e5; --neg: #e66767; --mid: #383835;
+      --good: #0ca30c; --bad: #e66767; --wash: rgba(255,255,255,0.06);
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --pos: #3987e5; --neg: #e66767; --mid: #383835;
+    --good: #0ca30c; --bad: #e66767; --wash: rgba(255,255,255,0.06);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--ink-2); margin: 0; }
+  .sub a, footer a { color: var(--s1); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border);
+                   border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover, select:hover { background: var(--wash); }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 16px; }
+  .filters label { color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 6px 12px; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px; }
+  .tile, .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .label { color: var(--ink-2); font-size: 13px; }
+  .tile .value { font-size: 28px; font-weight: 600; margin: 4px 0 2px; }
+  .tile .delta { font-size: 13px; color: var(--ink-2); }
+  .delta .up { color: var(--good); } .delta .down { color: var(--bad); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; }
+  .card .note { color: var(--ink-2); font-size: 13px; margin: 0 0 8px; }
+  .legend { display: flex; gap: 16px; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+  .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .legend i.dash { background: none !important; border-top: 2px dashed; height: 0; }
+  .chart { position: relative; }
+  svg { display: block; width: 100%; overflow: visible; }
+  svg text { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  svg text.lbl { fill: var(--ink-2); }
+  svg .gridline { stroke: var(--grid); stroke-width: 1; }
+  svg .base { stroke: var(--axis); stroke-width: 1; }
+  svg .xhair { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  #tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+         border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+         opacity: 0; transition: opacity .08s; z-index: 10; min-width: 140px; }
+  #tip .t { font-weight: 600; margin-bottom: 4px; }
+  #tip .r { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
+  #tip .r span:first-child { color: var(--ink-2); }
+  #tip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .tablecard { margin-top: 12px; display: none; overflow-x: auto; }
+  .tablecard.show { display: block; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 860px) { .tiles { grid-template-columns: 1fr 1fr; } .grid { grid-template-columns: 1fr; } }
+  @media (max-width: 420px) { .tile .value { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Finance KPI Dashboard</h1>
+      <p class="sub">Illustrative company, three regions, $ thousands. <a href="https://github.com/MuhammedAnshajK/finance-kpi-dashboard">Project on GitHub</a></p>
+    </div>
+    <div class="actions">
+      <button id="tableBtn" aria-pressed="false">Show table</button>
+      <button id="themeBtn" title="Switch light or dark">Dark mode</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label>Region
+      <select id="region"><option>All regions</option><option>North</option><option>South</option><option>West</option></select>
+    </label>
+    <label>Period
+      <span class="seg" id="period">
+        <button data-p="12m" aria-pressed="true">Last 12 months</button>
+        <button data-p="ytd" aria-pressed="false">2025 YTD</button>
+        <button data-p="24m" aria-pressed="false">Last 24 months</button>
+      </span>
+    </label>
+  </div>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Revenue vs budget</h2>
+      <p class="note" id="revNote"></p>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Actual</span><span><i class="dash" style="border-color:var(--s2)"></i>Budget</span></div>
+      <div class="chart" id="revChart"></div>
+    </div>
+    <div class="card">
+      <h2>Variance to budget by month</h2>
+      <p class="note">Actual revenue less budget, as % of budget. Blue is ahead, red is behind.</p>
+      <div class="chart" id="varChart"></div>
+    </div>
+    <div class="card">
+      <h2>Gross and EBITDA margin</h2>
+      <p class="note">Monthly margin as % of revenue.</p>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Gross margin</span><span><i style="background:var(--s2)"></i>EBITDA margin</span></div>
+      <div class="chart" id="marginChart"></div>
+    </div>
+    <div class="card">
+      <h2>Revenue by region</h2>
+      <p class="note" id="regionNote"></p>
+      <div class="chart" id="regionChart"></div>
+    </div>
+  </section>
+
+  <section class="card tablecard" id="tableCard">
+    <h2>Monthly detail</h2>
+    <p class="note">The numbers behind the charts, for the selected region and period.</p>
+    <table id="table"></table>
+  </section>
+
+  <footer>
+    Data is illustrative, made by <code>generate_data.py</code>. EBITDA = revenue less cost of sales less operating expenses.
+    DSO = month-end receivables divided by annualised monthly revenue, times 365.
+  </footer>
+</div>
+<div id="tip" role="status" aria-live="polite"></div>
+
+<script>
+const RAW = [{"month":"2023-11","region":"North","revenue":396.4,"budget_revenue":394.8,"cost_of_sales":249.5,"operating_expenses":91.2,"receivables":558.9},{"month":"2023-12","region":"North","revenue":399.5,"budget_revenue":393.8,"cost_of_sales":245.7,"operating_expenses":95.0,"receivables":552.9},{"month":"2024-01","region":"North","revenue":395.6,"budget_revenue":401.9,"cost_of_sales":247.8,"operating_expenses":91.6,"receivables":566.1},{"month":"2024-02","region":"North","revenue":395.7,"budget_revenue":418.3,"cost_of_sales":246.0,"operating_expenses":94.4,"receivables":565.1},{"month":"2024-03","region":"North","revenue":424.8,"budget_revenue":439.7,"cost_of_sales":260.1,"operating_expenses":95.6,"receivables":573.0},{"month":"2024-04","region":"North","revenue":473.1,"budget_revenue":461.4,"cost_of_sales":287.9,"operating_expenses":93.4,"receivables":643.5},{"month":"2024-05","region":"North","revenue":498.5,"budget_revenue":478.6,"cost_of_sales":306.2,"operating_expenses":92.3,"receivables":670.1},{"month":"2024-06","region":"North","revenue":503.2,"budget_revenue":487.8,"cost_of_sales":305.7,"operating_expenses":96.8,"receivables":714.2},{"month":"2024-07","region":"North","revenue":488.1,"budget_revenue":487.3,"cost_of_sales":292.1,"operating_expenses":94.7,"receivables":677.3},{"month":"2024-08","region":"North","revenue":493.5,"budget_revenue":478.2,"cost_of_sales":298.1,"operating_expenses":97.9,"receivables":682.3},{"month":"2024-09","region":"North","revenue":473.4,"budget_revenue":464.0,"cost_of_sales":290.7,"operating_expenses":94.6,"receivables":632.8},{"month":"2024-10","region":"North","revenue":430.9,"budget_revenue":449.4,"cost_of_sales":262.4,"operating_expenses":94.2,"receivables":571.8},{"month":"2024-11","region":"North","revenue":446.5,"budget_revenue":439.6,"cost_of_sales":270.0,"operating_expenses":96.2,"receivables":584.7},{"month":"2024-12","region":"North","revenue":429.5,"budget_revenue":438.5,"cost_of_sales":254.2,"operating_expenses":98.2,"receivables":581.6},{"month":"2025-01","region":"North","revenue":434.6,"budget_revenue":447.6,"cost_of_sales":258.3,"operating_expenses":95.7,"receivables":571.7},{"month":"2025-02","region":"North","revenue":491.0,"budget_revenue":465.8,"cost_of_sales":292.0,"operating_expenses":98.4,"receivables":661.7},{"month":"2025-03","region":"North","revenue":509.4,"budget_revenue":489.6,"cost_of_sales":300.8,"operating_expenses":96.9,"receivables":638.5},{"month":"2025-04","region":"North","revenue":507.8,"budget_revenue":513.8,"cost_of_sales":304.2,"operating_expenses":97.2,"receivables":693.1},{"month":"2025-05","region":"North","revenue":557.4,"budget_revenue":533.0,"cost_of_sales":332.6,"operating_expenses":100.2,"receivables":716.2},{"month":"2025-06","region":"North","revenue":570.7,"budget_revenue":543.2,"cost_of_sales":338.0,"operating_expenses":98.3,"receivables":717.4},{"month":"2025-07","region":"North","revenue":551.3,"budget_revenue":542.6,"cost_of_sales":327.9,"operating_expenses":100.6,"receivables":735.8},{"month":"2025-08","region":"North","revenue":532.9,"budget_revenue":532.5,"cost_of_sales":316.6,"operating_expenses":103.5,"receivables":679.6},{"month":"2025-09","region":"North","revenue":501.4,"budget_revenue":516.6,"cost_of_sales":298.9,"operating_expenses":98.5,"receivables":643.0},{"month":"2025-10","region":"North","revenue":521.7,"budget_revenue":500.4,"cost_of_sales":306.3,"operating_expenses":98.6,"receivables":647.9},{"month":"2023-11","region":"South","revenue":302.8,"budget_revenue":291.4,"cost_of_sales":187.6,"operating_expenses":70.1,"receivables":532.1},{"month":"2023-12","region":"South","revenue":272.9,"budget_revenue":289.6,"cost_of_sales":167.6,"operating_expenses":69.2,"receivables":465.6},{"month":"2024-01","region":"South","revenue":285.2,"budget_revenue":294.6,"cost_of_sales":175.2,"operating_expenses":67.1,"receivables":480.4},{"month":"2024-02","region":"South","revenue":301.6,"budget_revenue":305.5,"cost_of_sales":182.9,"operating_expenses":70.6,"receivables":498.8},{"month":"2024-03","region":"South","revenue":317.5,"budget_revenue":319.9,"cost_of_sales":197.0,"operating_expenses":71.0,"receivables":547.9},{"month":"2024-04","region":"South","revenue":325.5,"budget_revenue":334.5,"cost_of_sales":198.5,"operating_expenses":70.0,"receivables":528.2},{"month":"2024-05","region":"South","revenue":352.6,"budget_revenue":345.8,"cost_of_sales":215.2,"operating_expenses":71.0,"receivables":586.8},{"month":"2024-06","region":"South","revenue":331.7,"budget_revenue":351.1,"cost_of_sales":203.3,"operating_expenses":68.1,"receivables":566.7},{"month":"2024-07","region":"South","revenue":360.9,"budget_revenue":349.5,"cost_of_sales":217.0,"operating_expenses":69.6,"receivables":572.3},{"month":"2024-08","region":"South","revenue":353.1,"budget_revenue":341.8,"cost_of_sales":211.0,"operating_expenses":68.9,"receivables":576.9},{"month":"2024-09","region":"South","revenue":314.9,"budget_revenue":330.4,"cost_of_sales":188.9,"operating_expenses":72.1,"receivables":497.1},{"month":"2024-10","region":"South","revenue":317.1,"budget_revenue":318.9,"cost_of_sales":191.0,"operating_expenses":70.3,"receivables":528.9},{"month":"2024-11","region":"South","revenue":307.6,"budget_revenue":310.9,"cost_of_sales":187.0,"operating_expenses":71.7,"receivables":504.9},{"month":"2024-12","region":"South","revenue":299.1,"budget_revenue":308.9,"cost_of_sales":180.7,"operating_expenses":74.0,"receivables":485.2},{"month":"2025-01","region":"South","revenue":311.8,"budget_revenue":314.2,"cost_of_sales":186.6,"operating_expenses":70.5,"receivables":485.9},{"month":"2025-02","region":"South","revenue":320.3,"budget_revenue":325.9,"cost_of_sales":190.8,"operating_expenses":71.2,"receivables":496.3},{"month":"2025-03","region":"South","revenue":326.5,"budget_revenue":341.3,"cost_of_sales":193.7,"operating_expenses":71.5,"receivables":532.7},{"month":"2025-04","region":"South","revenue":369.7,"budget_revenue":356.8,"cost_of_sales":223.0,"operating_expenses":71.8,"receivables":588.7},{"month":"2025-05","region":"South","revenue":358.6,"budget_revenue":368.9,"cost_of_sales":215.3,"operating_expenses":75.2,"receivables":563.4},{"month":"2025-06","region":"South","revenue":374.1,"budget_revenue":374.6,"cost_of_sales":219.1,"operating_expenses":74.9,"receivables":565.9},{"month":"2025-07","region":"South","revenue":358.5,"budget_revenue":372.9,"cost_of_sales":212.0,"operating_expenses":73.5,"receivables":552.5},{"month":"2025-08","region":"South","revenue":373.9,"budget_revenue":364.6,"cost_of_sales":218.8,"operating_expenses":76.3,"receivables":555.0},{"month":"2025-09","region":"South","revenue":350.2,"budget_revenue":352.5,"cost_of_sales":206.7,"operating_expenses":76.1,"receivables":523.7},{"month":"2025-10","region":"South","revenue":330.9,"budget_revenue":340.2,"cost_of_sales":194.1,"operating_expenses":74.4,"receivables":493.5},{"month":"2023-11","region":"West","revenue":226.9,"budget_revenue":235.0,"cost_of_sales":138.7,"operating_expenses":54.8,"receivables":361.3},{"month":"2023-12","region":"West","revenue":234.4,"budget_revenue":235.2,"cost_of_sales":147.1,"operating_expenses":56.9,"receivables":370.6},{"month":"2024-01","region":"West","revenue":250.5,"budget_revenue":241.0,"cost_of_sales":152.4,"operating_expenses":56.6,"receivables":371.9},{"month":"2024-02","region":"West","revenue":249.9,"budget_revenue":251.7,"cost_of_sales":155.2,"operating_expenses":55.3,"receivables":365.4},{"month":"2024-03","region":"West","revenue":261.1,"budget_revenue":265.5,"cost_of_sales":157.8,"operating_expenses":55.1,"receivables":404.6},{"month":"2024-04","region":"West","revenue":277.5,"budget_revenue":279.6,"cost_of_sales":170.4,"operating_expenses":57.6,"receivables":435.4},{"month":"2024-05","region":"West","revenue":292.2,"budget_revenue":291.1,"cost_of_sales":177.3,"operating_expenses":55.2,"receivables":429.3},{"month":"2024-06","region":"West","revenue":311.5,"budget_revenue":297.7,"cost_of_sales":189.4,"operating_expenses":56.7,"receivables":473.6},{"month":"2024-07","region":"West","revenue":285.5,"budget_revenue":298.4,"cost_of_sales":173.1,"operating_expenses":56.8,"receivables":435.7},{"month":"2024-08","region":"West","revenue":284.6,"budget_revenue":293.9,"cost_of_sales":170.0,"operating_expenses":55.6,"receivables":406.9},{"month":"2024-09","region":"West","revenue":290.0,"budget_revenue":286.2,"cost_of_sales":174.4,"operating_expenses":56.3,"receivables":409.8},{"month":"2024-10","region":"West","revenue":290.6,"budget_revenue":278.2,"cost_of_sales":176.8,"operating_expenses":57.8,"receivables":427.3},{"month":"2024-11","region":"West","revenue":272.7,"budget_revenue":273.1,"cost_of_sales":163.7,"operating_expenses":57.8,"receivables":410.1},{"month":"2024-12","region":"West","revenue":267.4,"budget_revenue":273.4,"cost_of_sales":159.4,"operating_expenses":57.0,"receivables":381.0},{"month":"2025-01","region":"West","revenue":287.5,"budget_revenue":280.0,"cost_of_sales":173.4,"operating_expenses":57.5,"receivables":420.7},{"month":"2025-02","region":"West","revenue":283.0,"budget_revenue":292.5,"cost_of_sales":169.3,"operating_expenses":60.1,"receivables":420.9},{"month":"2025-03","region":"West","revenue":299.0,"budget_revenue":308.5,"cost_of_sales":179.9,"operating_expenses":57.8,"receivables":439.7},{"month":"2025-04","region":"West","revenue":341.9,"budget_revenue":324.9,"cost_of_sales":200.6,"operating_expenses":58.4,"receivables":465.1},{"month":"2025-05","region":"West","revenue":354.8,"budget_revenue":338.2,"cost_of_sales":208.9,"operating_expenses":59.5,"receivables":518.5},{"month":"2025-06","region":"West","revenue":357.0,"budget_revenue":345.9,"cost_of_sales":214.7,"operating_expenses":60.5,"receivables":486.5},{"month":"2025-07","region":"West","revenue":358.8,"budget_revenue":346.8,"cost_of_sales":208.5,"operating_expenses":58.3,"receivables":477.3},{"month":"2025-08","region":"West","revenue":334.5,"budget_revenue":341.6,"cost_of_sales":196.5,"operating_expenses":59.0,"receivables":463.7},{"month":"2025-09","region":"West","revenue":346.8,"budget_revenue":332.6,"cost_of_sales":205.6,"operating_expenses":60.5,"receivables":462.5},{"month":"2025-10","region":"West","revenue":330.1,"budget_revenue":323.3,"cost_of_sales":190.6,"operating_expenses":61.5,"receivables":429.9}];
+const REGIONS = ["North", "South", "West"];
+const MONTHS = [...new Set(RAW.map(r => r.month))].sort();
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const mLabel = m => MON[+m.slice(5) - 1] + " " + m.slice(2, 4);
+const state = { region: "All regions", period: "12m" };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmtK = v => "$" + Math.round(v).toLocaleString("en-US") + "k";
+const fmtM = v => "$" + (v / 1000).toFixed(2) + "m";
+const pct = (v, d = 1) => (v * 100).toFixed(d) + "%";
+const sPct = (v, d = 1) => (v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(d) + "%";
+const sPts = v => (v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(1) + " pts";
+const NS = "http://www.w3.org/2000/svg";
+
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+function periodMonths(p) {
+  if (p === "24m") return MONTHS;
+  if (p === "ytd") return MONTHS.filter(m => m.startsWith("2025-"));
+  return MONTHS.slice(-12);
+}
+function priorMonths(p) {
+  if (p === "12m") return MONTHS.slice(-24, -12);
+  if (p === "ytd") return MONTHS.filter(m => m >= "2024-01" && m <= "2024-10");
+  return null;
+}
+
+// One row per month: sums across the selected region(s), plus derived KPIs.
+function series(months, region) {
+  return months.map(m => {
+    const rows = RAW.filter(r => r.month === m && (region === "All regions" || r.region === region));
+    const s = k => rows.reduce((a, r) => a + r[k], 0);
+    const rev = s("revenue"), bud = s("budget_revenue"), cos = s("cost_of_sales"), opex = s("operating_expenses"), ar = s("receivables");
+    return { m, rev, bud, gp: rev - cos, ebitda: rev - cos - opex, ar,
+             varPct: rev / bud - 1, gm: (rev - cos) / rev, em: (rev - cos - opex) / rev, dso: ar / (rev * 12) * 365 };
+  });
+}
+function totals(rows) {
+  const t = { rev: 0, bud: 0, gp: 0, ebitda: 0 };
+  rows.forEach(r => { t.rev += r.rev; t.bud += r.bud; t.gp += r.gp; t.ebitda += r.ebitda; });
+  t.gm = t.gp / t.rev; t.em = t.ebitda / t.rev; t.dso = rows[rows.length - 1].dso;
+  return t;
+}
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById("tip");
+function showTip(evt, title, rows) {
+  tip.replaceChildren();
+  const t = document.createElement("div"); t.className = "t"; t.textContent = title; tip.appendChild(t);
+  rows.forEach(([name, value, color]) => {
+    const r = document.createElement("div"); r.className = "r";
+    const a = document.createElement("span");
+    if (color) { const sw = document.createElement("i"); sw.className = "sw"; sw.style.background = color; a.appendChild(sw); }
+    a.appendChild(document.createTextNode(name));
+    const b = document.createElement("span"); b.textContent = value;
+    r.append(a, b); tip.appendChild(r);
+  });
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = evt.clientX + 14, y = evt.clientY - h - 10;
+  if (x + w > window.innerWidth - 8) x = evt.clientX - w - 14;
+  if (y < 8) y = evt.clientY + 16;
+  tip.style.left = x + "px"; tip.style.top = y + "px"; tip.style.opacity = 1;
+}
+const hideTip = () => { tip.style.opacity = 0; };
+
+/* ---------- scales & axes ---------- */
+function niceTicks(lo, hi, n = 4) {
+  const span = hi - lo, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => span / s <= n) || 10 * mag;
+  const ticks = [];
+  for (let v = Math.floor(lo / step) * step; v <= hi + step * 1e-9; v += step) ticks.push(+v.toFixed(10));
+  if (ticks[ticks.length - 1] < hi) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+function frame(container, height) {
+  container.replaceChildren();
+  const W = Math.max(280, container.clientWidth);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${height}`, height, role: "img" }, container);
+  return { svg, W, H: height };
+}
+function xTickEvery(n, width) { const fit = Math.max(2, Math.floor(width / 56)); return Math.ceil(n / fit); }
+
+/* ---------- line chart with crosshair ---------- */
+function lineChart(container, { labels, lines, fmtAxis, fmtTip, yZero, title }) {
+  const { svg, W, H } = frame(container, 240);
+  const m = { l: 52, r: 16, t: 10, b: 26 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const all = lines.flatMap(s => s.values);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (yZero) lo = 0; else { const pad = (hi - lo) * 0.15; lo -= pad; hi += pad; }
+  const ticks = niceTicks(lo, hi); lo = ticks[0]; hi = ticks[ticks.length - 1];
+  const x = i => m.l + (labels.length === 1 ? iw / 2 : i * iw / (labels.length - 1));
+  const y = v => m.t + ih - (v - lo) / (hi - lo) * ih;
+  ticks.forEach(t => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), class: t === lo ? "base" : "gridline" }, svg);
+    el("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, svg).textContent = fmtAxis(t);
+  });
+  const every = xTickEvery(labels.length, iw);
+  labels.forEach((lab, i) => {
+    if ((labels.length - 1 - i) % every) return;
+    el("text", { x: x(i), y: H - 6, "text-anchor": "middle" }, svg).textContent = mLabel(lab);
+  });
+  lines.forEach(s => {
+    const d = s.values.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join("");
+    el("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round",
+                 "stroke-dasharray": s.dash ? "5 4" : "none" }, svg);
+  });
+  // end-point dots so the latest value is easy to find
+  lines.forEach(s => el("circle", { cx: x(s.values.length - 1), cy: y(s.values[s.values.length - 1]), r: 4,
+                                    fill: s.color, stroke: css("--surface"), "stroke-width": 2 }, svg));
+  const xh = el("line", { y1: m.t, y2: m.t + ih, class: "xhair", visibility: "hidden" }, svg);
+  const dots = lines.map(s => el("circle", { r: 4, fill: s.color, stroke: css("--surface"), "stroke-width": 2, visibility: "hidden" }, svg));
+  const hit = el("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" }, svg);
+  const move = evt => {
+    const box = svg.getBoundingClientRect(), px = (evt.clientX - box.left) * W / box.width;
+    const i = Math.max(0, Math.min(labels.length - 1, Math.round((px - m.l) / iw * (labels.length - 1))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("visibility", "visible");
+    dots.forEach((d, k) => { d.setAttribute("cx", x(i)); d.setAttribute("cy", y(lines[k].values[i])); d.setAttribute("visibility", "visible"); });
+    showTip(evt, mLabel(labels[i]), fmtTip(i));
+  };
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerleave", () => { xh.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); hideTip(); });
+  svg.setAttribute("aria-label", title);
+}
+
+/* ---------- bars ---------- */
+// Rounded 4px on the data end only; the baseline end stays square.
+function barPath(x, w, y0, y1, r = 4) {
+  const up = y1 < y0, h = Math.abs(y1 - y0); r = Math.min(r, h, w / 2);
+  if (h < 0.5) return "";
+  return up
+    ? `M${x},${y0}V${y1 + r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 + r}V${y0}Z`
+    : `M${x},${y0}V${y1 - r}Q${x},${y1} ${x + r},${y1}H${x + w - r}Q${x + w},${y1} ${x + w},${y1 - r}V${y0}Z`;
+}
+function hBarPath(x0, x1, y, h, r = 4) {
+  r = Math.min(r, (x1 - x0), h / 2);
+  return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`;
+}
+
+function varianceChart(container, rows) {
+  const { svg, W, H } = frame(container, 240);
+  const m = { l: 52, r: 16, t: 10, b: 26 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const vals = rows.map(r => r.varPct);
+  const ext = Math.max(0.01, ...vals.map(Math.abs));
+  const ticks = niceTicks(-ext, ext, 4), lo = ticks[0], hi = ticks[ticks.length - 1];
+  const y = v => m.t + ih - (v - lo) / (hi - lo) * ih;
+  ticks.forEach(t => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), class: Math.abs(t) < 1e-9 ? "base" : "gridline" }, svg);
+    el("text", { x: m.l - 8, y: y(t) + 4, "text-anchor": "end" }, svg).textContent = (t > 0 ? "+" : "") + (t * 100).toFixed(t && Math.abs(t) < 0.01 ? 1 : 0) + "%";
+  });
+  const slot = iw / rows.length, bw = Math.max(3, Math.min(28, slot - 2));
+  const every = xTickEvery(rows.length, iw);
+  rows.forEach((r, i) => {
+    const cx = m.l + slot * i + slot / 2;
+    const p = el("path", { d: barPath(cx - bw / 2, bw, y(0), y(r.varPct)), fill: r.varPct >= 0 ? css("--pos") : css("--neg") }, svg);
+    const hit = el("rect", { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", e => { p.setAttribute("opacity", 0.8);
+      showTip(e, mLabel(r.m), [["Actual", fmtK(r.rev)], ["Budget", fmtK(r.bud)], ["Variance", sPct(r.varPct)]]); });
+    hit.addEventListener("pointerleave", () => { p.removeAttribute("opacity"); hideTip(); });
+    if (!((rows.length - 1 - i) % every)) el("text", { x: cx, y: H - 6, "text-anchor": "middle" }, svg).textContent = mLabel(r.m);
+  });
+  svg.setAttribute("aria-label", "Monthly revenue variance to budget");
+}
+
+function regionChart(container, months) {
+  const { svg, W, H } = frame(container, 240);
+  const data = REGIONS.map(name => {
+    const t = totals(series(months, name));
+    return { name, rev: t.rev, bud: t.bud };
+  });
+  const total = data.reduce((a, d) => a + d.rev, 0);
+  const m = { l: 56, r: 92, t: 18, b: 12 }, iw = W - m.l - m.r;
+  const max = Math.max(...data.map(d => Math.max(d.rev, d.bud)));
+  const x = v => m.l + v / max * iw, rowH = (H - m.t - m.b) / data.length, bh = Math.min(30, rowH * 0.5);
+  el("line", { x1: m.l, x2: m.l, y1: m.t - 6, y2: H - m.b, class: "base" }, svg);
+  data.forEach((d, i) => {
+    const yy = m.t + rowH * i + (rowH - bh) / 2;
+    const dim = state.region !== "All regions" && state.region !== d.name;
+    const p = el("path", { d: hBarPath(m.l, x(d.rev), yy, bh), fill: css("--s1"), opacity: dim ? 0.3 : 1 }, svg);
+    // budget marker: a short tick at the budget value
+    el("line", { x1: x(d.bud), x2: x(d.bud), y1: yy - 5, y2: yy + bh + 5, stroke: css("--ink-2"), "stroke-width": 2, "stroke-linecap": "round" }, svg);
+    el("text", { x: m.l - 8, y: yy + bh / 2 + 4, "text-anchor": "end", class: "lbl" }, svg).textContent = d.name;
+    el("text", { x: Math.max(x(d.rev), x(d.bud)) + 8, y: yy + bh / 2 + 4, class: "lbl" }, svg).textContent = fmtM(d.rev) + " · " + pct(d.rev / total, 0);
+    const hit = el("rect", { x: 0, y: m.t + rowH * i, width: W, height: rowH, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", e => showTip(e, d.name, [["Revenue", fmtK(d.rev)], ["Budget", fmtK(d.bud)],
+      ["Variance", sPct(d.rev / d.bud - 1)], ["Share of total", pct(d.rev / total)]]));
+    hit.addEventListener("pointerleave", hideTip);
+  });
+  svg.setAttribute("aria-label", "Revenue by region for the selected period");
+}
+
+/* ---------- tiles & table ---------- */
+function tile(label, value, deltaHtmlParts) {
+  const d = document.createElement("div"); d.className = "tile";
+  const a = document.createElement("div"); a.className = "label"; a.textContent = label;
+  const b = document.createElement("div"); b.className = "value"; b.textContent = value;
+  const c = document.createElement("div"); c.className = "delta";
+  deltaHtmlParts.forEach(([text, cls]) => { const s = document.createElement("span"); if (cls) s.className = cls; s.textContent = text; c.appendChild(s); });
+  d.append(a, b, c); return d;
+}
+const dir = (v, goodWhenUp = true) => (v >= 0) === goodWhenUp ? "up" : "down";
+const arrow = v => v >= 0 ? "▲ " : "▼ ";
+
+function render() {
+  const months = periodMonths(state.period), rows = series(months, state.region), t = totals(rows);
+  const pm = priorMonths(state.period), p = pm ? totals(series(pm, state.region)) : null;
+  const vsLabel = state.period === "ytd" ? " vs 2024 YTD" : " vs prior 12 months";
+  const tiles = document.getElementById("tiles"); tiles.replaceChildren();
+  const vb = t.rev / t.bud - 1;
+  tiles.append(
+    tile("Revenue", fmtM(t.rev), p ? [[arrow(t.rev / p.rev - 1) + sPct(t.rev / p.rev - 1), dir(t.rev / p.rev - 1)], [vsLabel]]
+                                   : [[arrow(vb) + sPct(vb), dir(vb)], [" vs budget"]]),
+    tile("Variance to budget", sPct(vb), [[fmtK(t.rev - t.bud), dir(vb)], [" against " + fmtM(t.bud) + " budget"]]),
+    tile("Gross margin", pct(t.gm), p ? [[arrow(t.gm - p.gm) + sPts(t.gm - p.gm), dir(t.gm - p.gm)], [vsLabel]] : [["EBITDA margin " + pct(t.em)]]),
+    tile("EBITDA margin", pct(t.em), p ? [[arrow(t.em - p.em) + sPts(t.em - p.em), dir(t.em - p.em)], [vsLabel]] : [["EBITDA " + fmtM(t.ebitda)]]),
+  );
+  const dsoFirst = series([months[0]], state.region)[0].dso, dd = t.dso - dsoFirst;
+  tiles.append(tile("Days sales outstanding", t.dso.toFixed(1) + " days",
+    [[arrow(dd) + Math.abs(dd).toFixed(1) + " days", dir(dd, false)], [" since " + mLabel(months[0])]]));
+
+  const scope = state.region === "All regions" ? "All regions" : state.region;
+  document.getElementById("revNote").textContent = scope + ", monthly revenue. Hover for values.";
+  document.getElementById("regionNote").textContent = "Bar is actual revenue, tick is budget. " +
+    (state.region === "All regions" ? "All regions shown." : state.region + " highlighted.");
+
+  const labels = rows.map(r => r.m);
+  lineChart(document.getElementById("revChart"), {
+    title: "Revenue actual vs budget", labels,
+    lines: [{ name: "Actual", color: css("--s1"), values: rows.map(r => r.rev) },
+            { name: "Budget", color: css("--s2"), values: rows.map(r => r.bud), dash: true }],
+    fmtAxis: v => "$" + Math.round(v).toLocaleString("en-US") + "k",
+    fmtTip: i => [["Actual", fmtK(rows[i].rev), css("--s1")], ["Budget", fmtK(rows[i].bud), css("--s2")], ["Variance", sPct(rows[i].varPct)]],
+  });
+  varianceChart(document.getElementById("varChart"), rows);
+  lineChart(document.getElementById("marginChart"), {
+    title: "Gross and EBITDA margin", labels, yZero: true,
+    lines: [{ name: "Gross margin", color: css("--s1"), values: rows.map(r => r.gm) },
+            { name: "EBITDA margin", color: css("--s2"), values: rows.map(r => r.em) }],
+    fmtAxis: v => Math.round(v * 100) + "%",
+    fmtTip: i => [["Gross margin", pct(rows[i].gm), css("--s1")], ["EBITDA margin", pct(rows[i].em), css("--s2")]],
+  });
+  regionChart(document.getElementById("regionChart"), months);
+
+  const table = document.getElementById("table"); table.replaceChildren();
+  const head = ["Month", "Revenue", "Budget", "Variance", "Gross margin", "EBITDA", "EBITDA margin", "DSO (days)"];
+  const tr = document.createElement("tr"); head.forEach(h => { const th = document.createElement("th"); th.textContent = h; tr.appendChild(th); });
+  const thead = document.createElement("thead"); thead.appendChild(tr); table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  const addRow = (cells, bold) => { const r = document.createElement("tr"); cells.forEach(c => { const td = document.createElement("td"); td.textContent = c; if (bold) td.style.fontWeight = 600; r.appendChild(td); }); tbody.appendChild(r); };
+  rows.forEach(r => addRow([mLabel(r.m), fmtK(r.rev), fmtK(r.bud), sPct(r.varPct), pct(r.gm), fmtK(r.ebitda), pct(r.em), r.dso.toFixed(1)]));
+  addRow(["Total", fmtK(t.rev), fmtK(t.bud), sPct(vb), pct(t.gm), fmtK(t.ebitda), pct(t.em), t.dso.toFixed(1)], true);
+  table.appendChild(tbody);
+}
+
+/* ---------- controls ---------- */
+document.getElementById("region").addEventListener("change", e => { state.region = e.target.value; render(); });
+document.querySelectorAll("#period button").forEach(b => b.addEventListener("click", () => {
+  state.period = b.dataset.p;
+  document.querySelectorAll("#period button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+}));
+const tableBtn = document.getElementById("tableBtn");
+tableBtn.addEventListener("click", () => {
+  const on = document.getElementById("tableCard").classList.toggle("show");
+  tableBtn.setAttribute("aria-pressed", on); tableBtn.textContent = on ? "Hide table" : "Show table";
+});
+const themeBtn = document.getElementById("themeBtn");
+const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark"
+                                                             : matchMedia("(prefers-color-scheme: dark)").matches;
+const syncThemeBtn = () => { themeBtn.textContent = isDark() ? "Light mode" : "Dark mode"; };
+themeBtn.addEventListener("click", () => {
+  document.documentElement.dataset.theme = isDark() ? "light" : "dark";
+  try { localStorage.setItem("kpi-theme", document.documentElement.dataset.theme); } catch (e) {}
+  syncThemeBtn(); render();
+});
+try { const saved = localStorage.getItem("kpi-theme"); if (saved) document.documentElement.dataset.theme = saved; } catch (e) {}
+syncThemeBtn();
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 120); });
+render();
+</script>
+</body>
+</html>
