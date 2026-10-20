@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Finance KPI Dashboard</title>
-<meta name="description" content="Interactive finance KPI dashboard: revenue vs budget, margins, cash conversion and regional performance.">
+<title>Sales & Revenue Dashboard</title>
+<meta name="description" content="Interactive sales and revenue dashboard: revenue by product and region, monthly growth, margins, top segments and actual vs target.">
 <style>
   :root {
     --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
@@ -40,14 +40,14 @@
   button:hover, select:hover { background: var(--wash); }
   .filters { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 16px; }
   .filters label { color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .seg button { border: 0; border-radius: 0; padding: 6px 12px; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
-  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 12px; }
   .tile, .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .tile .label { color: var(--ink-2); font-size: 13px; }
-  .tile .value { font-size: 28px; font-weight: 600; margin: 4px 0 2px; }
+  .tile .value { font-size: 26px; font-weight: 600; margin: 4px 0 2px; }
   .tile .delta { font-size: 13px; color: var(--ink-2); }
   .delta .up { color: var(--good); } .delta .down { color: var(--bad); }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -77,7 +77,11 @@
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--ink-2); font-weight: 600; }
   footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
-  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+  .wide { grid-column: 1 / -1; }
+  .grid > * { min-width: 0; }
+  td .bar { display: inline-block; height: 8px; border-radius: 0 4px 4px 0; background: var(--s1); vertical-align: middle; margin-right: 8px; }
+  .up { color: var(--good); } .down { color: var(--bad); }
   @media (max-width: 860px) { .tiles { grid-template-columns: 1fr 1fr; } .grid { grid-template-columns: 1fr; } }
   @media (max-width: 420px) { .tile .value { font-size: 22px; } }
 </style>
@@ -86,8 +90,8 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Finance KPI Dashboard</h1>
-      <p class="sub">Illustrative company, three regions, $ thousands. <a href="https://muhammedanshajk.github.io/">Portfolio</a> · <a href="https://github.com/MuhammedAnshajK/finance-kpi-dashboard">Project on GitHub</a></p>
+      <h1>Sales & Revenue Dashboard</h1>
+      <p class="sub">Illustrative sportswear company, three regions and four product lines, $ thousands. <a href="https://muhammedanshajk.github.io/">Portfolio</a> · <a href="https://github.com/MuhammedAnshajK/finance-kpi-dashboard">Project on GitHub</a></p>
     </div>
     <div class="actions">
       <button id="tableBtn" aria-pressed="false">Show table</button>
@@ -98,6 +102,9 @@
   <div class="filters">
     <label>Region
       <select id="region"><option>All regions</option><option>North</option><option>South</option><option>West</option></select>
+    </label>
+    <label>Product
+      <select id="product"><option>All products</option><option>Running Shoes</option><option>Lifestyle Shoes</option><option>Apparel</option><option>Accessories</option></select>
     </label>
     <label>Period
       <span class="seg" id="period">
@@ -112,15 +119,21 @@
 
   <section class="grid">
     <div class="card">
-      <h2>Revenue vs budget</h2>
+      <h2>Revenue: actual vs target</h2>
       <p class="note" id="revNote"></p>
-      <div class="legend"><span><i style="background:var(--s1)"></i>Actual</span><span><i class="dash" style="border-color:var(--s2)"></i>Budget</span></div>
+      <div class="legend"><span><i style="background:var(--s1)"></i>Actual</span><span><i class="dash" style="border-color:var(--s2)"></i>Target</span></div>
       <div class="chart" id="revChart"></div>
     </div>
     <div class="card">
-      <h2>Variance to budget by month</h2>
-      <p class="note">Actual revenue less budget, as % of budget. Blue is ahead, red is behind.</p>
+      <h2>Variance to target by month</h2>
+      <p class="note">Actual revenue less target, as % of target. Blue is ahead, red is behind.</p>
       <div class="chart" id="varChart"></div>
+    </div>
+    <div class="card">
+      <h2>Monthly revenue growth</h2>
+      <p class="note" id="growthNote"></p>
+      <div class="seg" id="growthMode" style="margin-bottom:8px"><button data-g="yoy" aria-pressed="true">vs same month last year</button><button data-g="mom" aria-pressed="false">vs previous month</button></div>
+      <div class="chart" id="growthChart"></div>
     </div>
     <div class="card">
       <h2>Gross and EBITDA margin</h2>
@@ -129,21 +142,31 @@
       <div class="chart" id="marginChart"></div>
     </div>
     <div class="card">
+      <h2>Revenue by product</h2>
+      <p class="note" id="productNote"></p>
+      <div class="chart" id="productChart"></div>
+    </div>
+    <div class="card">
       <h2>Revenue by region</h2>
       <p class="note" id="regionNote"></p>
       <div class="chart" id="regionChart"></div>
+    </div>
+    <div class="card wide">
+      <h2>Top segments</h2>
+      <p class="note">Region and product combinations ranked by revenue for the selected period. Growth compares with the same months a year earlier.</p>
+      <div style="overflow-x:auto"><table id="segTable"></table></div>
     </div>
   </section>
 
   <section class="card tablecard" id="tableCard">
     <h2>Monthly detail</h2>
-    <p class="note">The numbers behind the charts, for the selected region and period.</p>
+    <p class="note">The numbers behind the charts, for the selected region, product and period.</p>
     <table id="table"></table>
   </section>
 
   <footer>
-    Data is illustrative, made by <code>generate_data.py</code>. EBITDA = revenue less cost of sales less operating expenses.
-    DSO = month-end receivables divided by annualised monthly revenue, times 365.
+    Data is illustrative, made by <code>generate_data.py</code>. Target = the monthly sales budget. EBITDA = revenue less cost of sales less operating expenses.
+    Growth vs last year compares each month with the same month a year earlier.
   </footer>
 </div>
 <div id="tip" role="status" aria-live="polite"></div>
@@ -151,12 +174,15 @@
 <script>
 const RAW = /*__DATA__*/[];
 const REGIONS = ["North", "South", "West"];
+const PRODUCTS = ["Running Shoes", "Lifestyle Shoes", "Apparel", "Accessories"];
 const MONTHS = [...new Set(RAW.map(r => r.month))].sort();
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const mLabel = m => MON[+m.slice(5) - 1] + " " + m.slice(2, 4);
-const state = { region: "All regions", period: "12m" };
+const state = { region: "All regions", product: "All products", period: "12m", growth: "yoy" };
+const prevMonth = m => MONTHS[MONTHS.indexOf(m) - 1];
+const lastYear = m => (+m.slice(0, 4) - 1) + m.slice(4);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const fmtK = v => "$" + Math.round(v).toLocaleString("en-US") + "k";
+const fmtK = v => (v < 0 ? "−$" : "$") + Math.abs(Math.round(v)).toLocaleString("en-US") + "k";
 const fmtM = v => "$" + (v / 1000).toFixed(2) + "m";
 const pct = (v, d = 1) => (v * 100).toFixed(d) + "%";
 const sPct = (v, d = 1) => (v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(d) + "%";
@@ -181,22 +207,31 @@ function priorMonths(p) {
   return null;
 }
 
-// One row per month: sums across the selected region(s), plus derived KPIs.
-function series(months, region) {
+// One row per month: sums across the selected region(s) and product(s), plus derived KPIs.
+// f = { region, product }; "All ..." means no filter on that dimension.
+const match = (r, f) => (f.region === "All regions" || r.region === f.region) && (f.product === "All products" || r.product === f.product);
+function monthSum(m, f) {
+  const rows = RAW.filter(r => r.month === m && match(r, f));
+  const s = k => rows.reduce((a, r) => a + r[k], 0);
+  return { rev: s("revenue"), bud: s("budget_revenue"), cos: s("cost_of_sales"), opex: s("operating_expenses"), units: s("units") };
+}
+function series(months, f) {
   return months.map(m => {
-    const rows = RAW.filter(r => r.month === m && (region === "All regions" || r.region === region));
-    const s = k => rows.reduce((a, r) => a + r[k], 0);
-    const rev = s("revenue"), bud = s("budget_revenue"), cos = s("cost_of_sales"), opex = s("operating_expenses"), ar = s("receivables");
-    return { m, rev, bud, gp: rev - cos, ebitda: rev - cos - opex, ar,
-             varPct: rev / bud - 1, gm: (rev - cos) / rev, em: (rev - cos - opex) / rev, dso: ar / (rev * 12) * 365 };
+    const c = monthSum(m, f), rev = c.rev;
+    const prev = prevMonth(m) ? monthSum(prevMonth(m), f).rev : null;
+    const ly = MONTHS.includes(lastYear(m)) ? monthSum(lastYear(m), f).rev : null;
+    return { m, rev, bud: c.bud, units: c.units, gp: rev - c.cos, ebitda: rev - c.cos - c.opex,
+             varPct: rev / c.bud - 1, gm: (rev - c.cos) / rev, em: (rev - c.cos - c.opex) / rev,
+             mom: prev ? rev / prev - 1 : null, yoy: ly ? rev / ly - 1 : null };
   });
 }
 function totals(rows) {
-  const t = { rev: 0, bud: 0, gp: 0, ebitda: 0 };
-  rows.forEach(r => { t.rev += r.rev; t.bud += r.bud; t.gp += r.gp; t.ebitda += r.ebitda; });
-  t.gm = t.gp / t.rev; t.em = t.ebitda / t.rev; t.dso = rows[rows.length - 1].dso;
+  const t = { rev: 0, bud: 0, gp: 0, ebitda: 0, units: 0 };
+  rows.forEach(r => { t.rev += r.rev; t.bud += r.bud; t.gp += r.gp; t.ebitda += r.ebitda; t.units += r.units; });
+  t.gm = t.gp / t.rev; t.em = t.ebitda / t.rev;
   return t;
 }
+const filt = () => ({ region: state.region, product: state.product });
 
 /* ---------- tooltip ---------- */
 const tip = document.getElementById("tip");
@@ -292,10 +327,11 @@ function hBarPath(x0, x1, y, h, r = 4) {
   return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`;
 }
 
-function varianceChart(container, rows) {
+// Signed % bars around a zero baseline (blue = positive, red = negative). Months with no value are left empty.
+function signedBars(container, rows, { get, tipRows, label }) {
   const { svg, W, H } = frame(container, 240);
   const m = { l: 52, r: 16, t: 10, b: 26 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
-  const vals = rows.map(r => r.varPct);
+  const vals = rows.map(get).filter(v => v !== null);
   const ext = Math.max(0.01, ...vals.map(Math.abs));
   const ticks = niceTicks(-ext, ext, 4), lo = ticks[0], hi = ticks[ticks.length - 1];
   const y = v => m.t + ih - (v - lo) / (hi - lo) * ih;
@@ -306,42 +342,81 @@ function varianceChart(container, rows) {
   const slot = iw / rows.length, bw = Math.max(3, Math.min(28, slot - 2));
   const every = xTickEvery(rows.length, iw);
   rows.forEach((r, i) => {
-    const cx = m.l + slot * i + slot / 2;
-    const p = el("path", { d: barPath(cx - bw / 2, bw, y(0), y(r.varPct)), fill: r.varPct >= 0 ? css("--pos") : css("--neg") }, svg);
-    const hit = el("rect", { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: "transparent" }, svg);
-    hit.addEventListener("pointermove", e => { p.setAttribute("opacity", 0.8);
-      showTip(e, mLabel(r.m), [["Actual", fmtK(r.rev)], ["Budget", fmtK(r.bud)], ["Variance", sPct(r.varPct)]]); });
-    hit.addEventListener("pointerleave", () => { p.removeAttribute("opacity"); hideTip(); });
+    const cx = m.l + slot * i + slot / 2, v = get(r);
     if (!((rows.length - 1 - i) % every)) el("text", { x: cx, y: H - 6, "text-anchor": "middle" }, svg).textContent = mLabel(r.m);
+    if (v === null) return;
+    const p = el("path", { d: barPath(cx - bw / 2, bw, y(0), y(v)), fill: v >= 0 ? css("--pos") : css("--neg") }, svg);
+    const hit = el("rect", { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", e => { p.setAttribute("opacity", 0.8); showTip(e, mLabel(r.m), tipRows(r)); });
+    hit.addEventListener("pointerleave", () => { p.removeAttribute("opacity"); hideTip(); });
   });
-  svg.setAttribute("aria-label", "Monthly revenue variance to budget");
+  svg.setAttribute("aria-label", label);
 }
 
-function regionChart(container, months) {
-  const { svg, W, H } = frame(container, 240);
-  const data = REGIONS.map(name => {
-    const t = totals(series(months, name));
-    return { name, rev: t.rev, bud: t.bud };
+// Horizontal bars of revenue by one dimension (region or product), with a target tick.
+function dimChart(container, months, dim, names) {
+  const data = names.map(name => {
+    const f = { ...filt(), [dim]: name };
+    const t = totals(series(months, f));
+    return { name, rev: t.rev, bud: t.bud, gm: t.gm };
   });
+  const { svg, W, H } = frame(container, Math.max(200, 56 * names.length + 30));
   const total = data.reduce((a, d) => a + d.rev, 0);
-  const m = { l: 56, r: 92, t: 18, b: 12 }, iw = W - m.l - m.r;
+  const narrow = W < 420;
+  const m = { l: narrow ? 104 : 112, r: narrow ? 64 : 92, t: 18, b: 12 }, iw = W - m.l - m.r;
   const max = Math.max(...data.map(d => Math.max(d.rev, d.bud)));
   const x = v => m.l + v / max * iw, rowH = (H - m.t - m.b) / data.length, bh = Math.min(30, rowH * 0.5);
+  const sel = dim === "region" ? state.region : state.product;
   el("line", { x1: m.l, x2: m.l, y1: m.t - 6, y2: H - m.b, class: "base" }, svg);
   data.forEach((d, i) => {
     const yy = m.t + rowH * i + (rowH - bh) / 2;
-    const dim = state.region !== "All regions" && state.region !== d.name;
-    const p = el("path", { d: hBarPath(m.l, x(d.rev), yy, bh), fill: css("--s1"), opacity: dim ? 0.3 : 1 }, svg);
-    // budget marker: a short tick at the budget value
+    const dim_ = !sel.startsWith("All") && sel !== d.name;
+    const p = el("path", { d: hBarPath(m.l, x(d.rev), yy, bh), fill: css("--s1"), opacity: dim_ ? 0.3 : 1 }, svg);
     el("line", { x1: x(d.bud), x2: x(d.bud), y1: yy - 5, y2: yy + bh + 5, stroke: css("--ink-2"), "stroke-width": 2, "stroke-linecap": "round" }, svg);
     el("text", { x: m.l - 8, y: yy + bh / 2 + 4, "text-anchor": "end", class: "lbl" }, svg).textContent = d.name;
-    el("text", { x: Math.max(x(d.rev), x(d.bud)) + 8, y: yy + bh / 2 + 4, class: "lbl" }, svg).textContent = fmtM(d.rev) + " · " + pct(d.rev / total, 0);
+    el("text", { x: Math.max(x(d.rev), x(d.bud)) + 8, y: yy + bh / 2 + 4, class: "lbl" }, svg).textContent =
+      narrow ? pct(d.rev / total, 0) : fmtM(d.rev) + " · " + pct(d.rev / total, 0);
     const hit = el("rect", { x: 0, y: m.t + rowH * i, width: W, height: rowH, fill: "transparent" }, svg);
-    hit.addEventListener("pointermove", e => showTip(e, d.name, [["Revenue", fmtK(d.rev)], ["Budget", fmtK(d.bud)],
-      ["Variance", sPct(d.rev / d.bud - 1)], ["Share of total", pct(d.rev / total)]]));
+    hit.addEventListener("pointermove", e => showTip(e, d.name, [["Revenue", fmtK(d.rev)], ["Target", fmtK(d.bud)],
+      ["vs target", sPct(d.rev / d.bud - 1)], ["Gross margin", pct(d.gm)], ["Share of total", pct(d.rev / total)]]));
     hit.addEventListener("pointerleave", hideTip);
   });
-  svg.setAttribute("aria-label", "Revenue by region for the selected period");
+  svg.setAttribute("aria-label", "Revenue by " + dim + " for the selected period");
+}
+
+// Region x product combinations ranked by revenue.
+function segmentTable(months) {
+  const pm = months.map(lastYear).filter(m => MONTHS.includes(m));
+  const segs = [];
+  REGIONS.forEach(region => PRODUCTS.forEach(product => {
+    const f = { region, product };
+    if (!match({ region, product }, filt())) return;
+    const t = totals(series(months, f));
+    const py = pm.length === months.length ? totals(series(pm, f)).rev : null;
+    segs.push({ name: region + " · " + product, rev: t.rev, bud: t.bud, gm: t.gm, growth: py ? t.rev / py - 1 : null });
+  }));
+  segs.sort((a, b) => b.rev - a.rev);
+  const total = segs.reduce((a, d) => a + d.rev, 0), max = segs[0].rev;
+  const table = document.getElementById("segTable"); table.replaceChildren();
+  const head = ["#", "Segment", "Revenue", "Share", "vs target", "Growth vs last year", "Gross margin"];
+  const tr = document.createElement("tr"); head.forEach(h => { const th = document.createElement("th"); th.textContent = h; tr.appendChild(th); });
+  const thead = document.createElement("thead"); thead.appendChild(tr); table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  segs.slice(0, 8).forEach((d, i) => {
+    const r = document.createElement("tr");
+    const td = (text, cls) => { const c = document.createElement("td"); if (cls) c.className = cls; c.textContent = text; r.appendChild(c); return c; };
+    td(String(i + 1));
+    const nameCell = td(d.name); nameCell.style.textAlign = "left";
+    const rc = td(""); const bar = document.createElement("span"); bar.className = "bar"; bar.style.width = Math.round(d.rev / max * 80) + "px";
+    rc.append(bar, document.createTextNode(fmtK(d.rev)));
+    td(pct(d.rev / total));
+    const v = d.rev / d.bud - 1; td(sPct(v), v >= 0 ? "up" : "down");
+    td(d.growth === null ? "n/a" : sPct(d.growth), d.growth === null ? "" : (d.growth >= 0 ? "up" : "down"));
+    td(pct(d.gm));
+    tbody.appendChild(r);
+  });
+  table.appendChild(tbody);
+  table.querySelectorAll("th")[1].style.textAlign = "left";
 }
 
 /* ---------- tiles & table ---------- */
@@ -357,36 +432,47 @@ const dir = (v, goodWhenUp = true) => (v >= 0) === goodWhenUp ? "up" : "down";
 const arrow = v => v >= 0 ? "▲ " : "▼ ";
 
 function render() {
-  const months = periodMonths(state.period), rows = series(months, state.region), t = totals(rows);
-  const pm = priorMonths(state.period), p = pm ? totals(series(pm, state.region)) : null;
+  const f = filt(), months = periodMonths(state.period), rows = series(months, f), t = totals(rows);
+  const pm = priorMonths(state.period), p = pm ? totals(series(pm, f)) : null;
   const vsLabel = state.period === "ytd" ? " vs 2024 YTD" : " vs prior 12 months";
   const tiles = document.getElementById("tiles"); tiles.replaceChildren();
   const vb = t.rev / t.bud - 1;
+  const last = rows[rows.length - 1];
   tiles.append(
     tile("Revenue", fmtM(t.rev), p ? [[arrow(t.rev / p.rev - 1) + sPct(t.rev / p.rev - 1), dir(t.rev / p.rev - 1)], [vsLabel]]
-                                   : [[arrow(vb) + sPct(vb), dir(vb)], [" vs budget"]]),
-    tile("Variance to budget", sPct(vb), [[fmtK(t.rev - t.bud), dir(vb)], [" against " + fmtM(t.bud) + " budget"]]),
+                                   : [[arrow(vb) + sPct(vb), dir(vb)], [" vs target"]]),
+    tile("Actual vs target", sPct(vb), [[fmtK(t.rev - t.bud), dir(vb)], [" against " + fmtM(t.bud) + " target"]]),
+    tile("Units sold", Math.round(t.units).toLocaleString("en-US") + "k", p ? [[arrow(t.units / p.units - 1) + sPct(t.units / p.units - 1), dir(t.units / p.units - 1)], [vsLabel]]
+                                   : [["Average price $" + (t.rev / t.units).toFixed(2)]]),
+    tile("Growth, " + mLabel(last.m) + " vs " + mLabel(lastYear(last.m)), last.yoy === null ? "n/a" : sPct(last.yoy),
+      [[arrow(last.mom) + sPct(last.mom), dir(last.mom)], [" vs " + mLabel(prevMonth(last.m))]]),
     tile("Gross margin", pct(t.gm), p ? [[arrow(t.gm - p.gm) + sPts(t.gm - p.gm), dir(t.gm - p.gm)], [vsLabel]] : [["EBITDA margin " + pct(t.em)]]),
     tile("EBITDA margin", pct(t.em), p ? [[arrow(t.em - p.em) + sPts(t.em - p.em), dir(t.em - p.em)], [vsLabel]] : [["EBITDA " + fmtM(t.ebitda)]]),
   );
-  const dsoFirst = series([months[0]], state.region)[0].dso, dd = t.dso - dsoFirst;
-  tiles.append(tile("Days sales outstanding", t.dso.toFixed(1) + " days",
-    [[arrow(dd) + Math.abs(dd).toFixed(1) + " days", dir(dd, false)], [" since " + mLabel(months[0])]]));
 
-  const scope = state.region === "All regions" ? "All regions" : state.region;
+  const scope = [state.region, state.product].join(", ");
   document.getElementById("revNote").textContent = scope + ", monthly revenue. Hover for values.";
-  document.getElementById("regionNote").textContent = "Bar is actual revenue, tick is budget. " +
+  document.getElementById("growthNote").textContent = state.growth === "yoy"
+    ? "Revenue growth against the same month a year earlier (removes seasonality). Months without a prior year are blank."
+    : "Revenue growth against the previous month. Includes seasonal swings.";
+  document.getElementById("productNote").textContent = "Bar is actual revenue, tick is target. " +
+    (state.product === "All products" ? "All products shown." : state.product + " highlighted.");
+  document.getElementById("regionNote").textContent = "Bar is actual revenue, tick is target. " +
     (state.region === "All regions" ? "All regions shown." : state.region + " highlighted.");
 
   const labels = rows.map(r => r.m);
   lineChart(document.getElementById("revChart"), {
-    title: "Revenue actual vs budget", labels,
+    title: "Revenue actual vs target", labels,
     lines: [{ name: "Actual", color: css("--s1"), values: rows.map(r => r.rev) },
-            { name: "Budget", color: css("--s2"), values: rows.map(r => r.bud), dash: true }],
+            { name: "Target", color: css("--s2"), values: rows.map(r => r.bud), dash: true }],
     fmtAxis: v => "$" + Math.round(v).toLocaleString("en-US") + "k",
-    fmtTip: i => [["Actual", fmtK(rows[i].rev), css("--s1")], ["Budget", fmtK(rows[i].bud), css("--s2")], ["Variance", sPct(rows[i].varPct)]],
+    fmtTip: i => [["Actual", fmtK(rows[i].rev), css("--s1")], ["Target", fmtK(rows[i].bud), css("--s2")], ["Variance", sPct(rows[i].varPct)]],
   });
-  varianceChart(document.getElementById("varChart"), rows);
+  signedBars(document.getElementById("varChart"), rows, { label: "Monthly revenue variance to target", get: r => r.varPct,
+    tipRows: r => [["Actual", fmtK(r.rev)], ["Target", fmtK(r.bud)], ["Variance", sPct(r.varPct)]] });
+  const gk = state.growth;
+  signedBars(document.getElementById("growthChart"), rows, { label: "Monthly revenue growth", get: r => r[gk],
+    tipRows: r => [["Revenue", fmtK(r.rev)], [gk === "yoy" ? "vs " + mLabel(lastYear(r.m)) : "vs " + mLabel(prevMonth(r.m)), sPct(r[gk])]] });
   lineChart(document.getElementById("marginChart"), {
     title: "Gross and EBITDA margin", labels, yZero: true,
     lines: [{ name: "Gross margin", color: css("--s1"), values: rows.map(r => r.gm) },
@@ -394,21 +480,29 @@ function render() {
     fmtAxis: v => Math.round(v * 100) + "%",
     fmtTip: i => [["Gross margin", pct(rows[i].gm), css("--s1")], ["EBITDA margin", pct(rows[i].em), css("--s2")]],
   });
-  regionChart(document.getElementById("regionChart"), months);
+  dimChart(document.getElementById("productChart"), months, "product", PRODUCTS);
+  dimChart(document.getElementById("regionChart"), months, "region", REGIONS);
+  segmentTable(months);
 
   const table = document.getElementById("table"); table.replaceChildren();
-  const head = ["Month", "Revenue", "Budget", "Variance", "Gross margin", "EBITDA", "EBITDA margin", "DSO (days)"];
+  const head = ["Month", "Revenue", "Target", "vs target", "Growth vs LY", "Units (k)", "Gross margin", "EBITDA", "EBITDA margin"];
   const tr = document.createElement("tr"); head.forEach(h => { const th = document.createElement("th"); th.textContent = h; tr.appendChild(th); });
   const thead = document.createElement("thead"); thead.appendChild(tr); table.appendChild(thead);
   const tbody = document.createElement("tbody");
   const addRow = (cells, bold) => { const r = document.createElement("tr"); cells.forEach(c => { const td = document.createElement("td"); td.textContent = c; if (bold) td.style.fontWeight = 600; r.appendChild(td); }); tbody.appendChild(r); };
-  rows.forEach(r => addRow([mLabel(r.m), fmtK(r.rev), fmtK(r.bud), sPct(r.varPct), pct(r.gm), fmtK(r.ebitda), pct(r.em), r.dso.toFixed(1)]));
-  addRow(["Total", fmtK(t.rev), fmtK(t.bud), sPct(vb), pct(t.gm), fmtK(t.ebitda), pct(t.em), t.dso.toFixed(1)], true);
+  rows.forEach(r => addRow([mLabel(r.m), fmtK(r.rev), fmtK(r.bud), sPct(r.varPct), r.yoy === null ? "n/a" : sPct(r.yoy), r.units.toFixed(1), pct(r.gm), fmtK(r.ebitda), pct(r.em)]));
+  addRow(["Total", fmtK(t.rev), fmtK(t.bud), sPct(vb), p ? sPct(t.rev / p.rev - 1) : "", t.units.toFixed(1), pct(t.gm), fmtK(t.ebitda), pct(t.em)], true);
   table.appendChild(tbody);
 }
 
 /* ---------- controls ---------- */
 document.getElementById("region").addEventListener("change", e => { state.region = e.target.value; render(); });
+document.getElementById("product").addEventListener("change", e => { state.product = e.target.value; render(); });
+document.querySelectorAll("#growthMode button").forEach(b => b.addEventListener("click", () => {
+  state.growth = b.dataset.g;
+  document.querySelectorAll("#growthMode button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+}));
 document.querySelectorAll("#period button").forEach(b => b.addEventListener("click", () => {
   state.period = b.dataset.p;
   document.querySelectorAll("#period button").forEach(x => x.setAttribute("aria-pressed", x === b));

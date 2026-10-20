@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-NUMERIC = ["revenue", "budget_revenue", "cost_of_sales", "operating_expenses", "receivables"]
+NUMERIC = ["units", "revenue", "budget_revenue", "cost_of_sales", "operating_expenses", "receivables"]
 
 
 def main():

@@ -1,9 +1,13 @@
-// Finance KPI Dashboard: DAX measures
+// Sales & Revenue Dashboard: DAX measures
 // Table names: Finance (from data/finance_monthly.csv) and 'Date' (calendar table, see BUILD_STEPS.md).
-// All amounts are $ thousands.
+// All amounts are $ thousands. "Target" is the budget_revenue column.
 
 // ---------- Base measures ----------
 Revenue = SUM ( Finance[revenue] )
+
+Units Sold = SUM ( Finance[units] )
+
+Average Selling Price = DIVIDE ( [Revenue], [Units Sold] )
 
 Budget Revenue = SUM ( Finance[budget_revenue] )
 
@@ -69,6 +73,34 @@ VAR ClosingRevenue =
 RETURN
     DIVIDE ( [Closing Receivables], ClosingRevenue * 12 ) * 365
 
-// ---------- Region share ----------
+// ---------- Monthly growth ----------
+// Use these on a visual with Date[Month] on the axis.
+Revenue PM = CALCULATE ( [Revenue], DATEADD ( 'Date'[Date], -1, MONTH ) )
+
+Revenue MoM % = DIVIDE ( [Revenue] - [Revenue PM], [Revenue PM] )
+
+// Same month last year: removes seasonality
+Revenue YoY Month % =
+VAR LY = CALCULATE ( [Revenue], SAMEPERIODLASTYEAR ( 'Date'[Date] ) )
+RETURN IF ( NOT ISBLANK ( LY ), DIVIDE ( [Revenue] - LY, LY ) )
+
+// ---------- Region and product share ----------
 Revenue Share of Total =
 DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( Finance[region] ) ) )
+
+Revenue Share of Products =
+DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( Finance[product] ) ) )
+
+// ---------- Top segments ----------
+// Share of all revenue in the current filter context, for a region x product table
+Segment Share = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( Finance[region], Finance[product] ) ) )
+
+// Rank of each region x product combination by revenue (1 = largest)
+Segment Rank =
+IF (
+    HASONEVALUE ( Finance[region] ) && HASONEVALUE ( Finance[product] ),
+    RANKX (
+        ALL ( Finance[region], Finance[product] ),
+        [Revenue], , DESC, DENSE
+    )
+)

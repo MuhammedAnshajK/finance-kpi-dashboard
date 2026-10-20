@@ -39,12 +39,16 @@ Format the `%` measures as **Percentage** with 1 decimal place, and the amounts 
 | Visual | Fields |
 |---|---|
 | Slicer (dropdown) | `Finance[region]` |
+| Slicer (dropdown) | `Finance[product]` |
 | Slicer (between) | `Date[Date]`, or a button-style slicer on `Date[Year]` |
-| 5 Card visuals | `Revenue`, `Variance to Budget %`, `Gross Margin %`, `EBITDA Margin %`, `DSO (days)` |
-| Line chart: revenue vs budget | X: `Date[Month]`; Y: `Revenue`, `Budget Revenue` (budget as a dashed line under **Format > Lines**) |
+| 6 Card visuals | `Revenue`, `Variance to Budget %` (label it "Actual vs target"), `Units Sold`, `Revenue YoY Month %`, `Gross Margin %`, `EBITDA Margin %` |
+| Line chart: revenue vs target | X: `Date[Month]`; Y: `Revenue`, `Budget Revenue` (rename it "Target" in the visual; dashed line under **Format > Lines**) |
 | Column chart: monthly variance | X: `Date[Month]`; Y: `Variance to Budget %`; **Format > Columns > fx**: colour by rules on `Variance Is Positive` (1 = blue, 0 = red) |
 | Line chart: margins | X: `Date[Month]`; Y: `Gross Margin %`, `EBITDA Margin %`; Y axis starts at 0 |
+| Column chart: monthly growth | X: `Date[Month]`; Y: `Revenue YoY Month %` (or `Revenue MoM %`); colour rules: green above 0, red below |
+| Bar chart: revenue by product | Y: `Finance[product]`; X: `Revenue`; tooltip: `Budget Revenue`, `Gross Margin %`, `Revenue Share of Products` |
 | Bar chart: revenue by region | Y: `Finance[region]`; X: `Revenue`; tooltip: `Budget Revenue`, `Revenue Share of Total` |
+| Table: top segments | Rows: `Finance[region]`, `Finance[product]`; values: `Revenue`, `Segment Share`, `Variance to Budget %`, `Revenue YoY %`, `Gross Margin %`; **Filters pane > Top N** on product = top 8 by `Revenue`, or sort by `Segment Rank` |
 
 For the subtitle under each card, use **Format > Callout value > Reference label** (newer versions) or a second card showing `Revenue YoY %`, `Gross Margin Change (pts)` and `EBITDA Margin Change (pts)`.
 
@@ -55,5 +59,5 @@ For the subtitle under each card, use **Format > Callout value > Reference label
 ## Checking the numbers
 
 With all regions and the last 12 months (Nov 2024 to Oct 2025) selected, the cards should show:
-revenue $13.97m, variance to budget +0.7%, gross margin 40.6%, EBITDA margin 20.8% and DSO 40.4 days.
+revenue $14.30m, actual vs target −1.0%, units sold 266k, gross margin 44.6% and EBITDA margin 25.2%. October 2025 revenue is +16.1% on October 2024.
 These are the same figures the web dashboard shows, so they are a quick check that the model is built correctly.
